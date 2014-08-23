@@ -2,6 +2,10 @@
 
 ## Synopsis
 
+Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
+
+This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
 ## Data processing
 
 ### Libraries
@@ -14,7 +18,7 @@ library(ggplot2)
 library(plyr)
 library(stringr)
 library(magrittr)
-library(reshape2)
+library(scales)
 ```
 
 ### Getting and reading data
@@ -35,89 +39,89 @@ data <- read.csv(bzfile(filename))
 
 ### Tidying data
 
-The event types are made up of 985 different strings. 
+First we would like to have a column names lowercase.
+
 
 
 ```r
-head(sort(unique(data$EVTYPE)),20)
+colnames(data) <- colnames(data) %>% tolower()
+```
+
+We know that the events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
+
+
+```r
+data$bgn_date = as.POSIXct(data$bgn_date, format = "%m/%d/%Y %H:%M:%S")
+data$year <- as.numeric(strftime(data$bgn_date, "%Y"))
+
+ggplot(data=data, aes(x=year)) + geom_histogram(binwidth=1, fill="orange") + scale_x_continuous(breaks=pretty_breaks(n=10)) + xlab('Year') + ylab("Number of events of any type") + ggtitle('Number of events per year')
+```
+
+![plot of chunk histogram_year](figure/histogram_year.png) 
+We see that events start to pick up around 1995, so we subset the data.
+
+
+```r
+data = data[data$year >= 1995,]
+```
+The event types are made up of 799 different strings. 
+
+
+```r
+head(sort(unique(data$evtype)),20)
 ```
 
 ```
-##  [1]    HIGH SURF ADVISORY   COASTAL FLOOD          FLASH FLOOD          
-##  [4]  LIGHTNING              TSTM WIND              TSTM WIND (G45)      
-##  [7]  WATERSPOUT             WIND                  ?                     
-## [10] ABNORMAL WARMTH        ABNORMALLY DRY         ABNORMALLY WET        
-## [13] ACCUMULATED SNOWFALL   AGRICULTURAL FREEZE    APACHE COUNTY         
-## [16] ASTRONOMICAL HIGH TIDE ASTRONOMICAL LOW TIDE  AVALANCE              
-## [19] AVALANCHE              BEACH EROSIN          
+##  [1]    HIGH SURF ADVISORY        COASTAL FLOOD             
+##  [3]  FLASH FLOOD                 LIGHTNING                 
+##  [5]  TSTM WIND                   TSTM WIND (G45)           
+##  [7]  WATERSPOUT                  WIND                      
+##  [9] ABNORMAL WARMTH             ABNORMALLY DRY             
+## [11] ABNORMALLY WET              ACCUMULATED SNOWFALL       
+## [13] AGRICULTURAL FREEZE         ASTRONOMICAL HIGH TIDE     
+## [15] ASTRONOMICAL LOW TIDE       AVALANCHE                  
+## [17] BEACH EROSIN                Beach Erosion              
+## [19] BEACH EROSION               BEACH EROSION/COASTAL FLOOD
 ## 985 Levels:    HIGH SURF ADVISORY  COASTAL FLOOD ... WND
 ```
 
-As we can see, there are many spelling mistakes (for example "AVALANCE" instead of "AVALANCHE"), abbreviations, untrimmed strings and unnecessarily detailed classes, so we need to fix that. First we make all values upper case, then change "/" and "&" to "AND" to make it easier on the eyes. We focus on the classes that are the most deadly.
+As we can see, there are many spelling mistakes (for example "AVALANCE" instead of "AVALANCHE"), abbreviations, untrimmed strings and unnecessarily detailed classes, so we need to fix that. According to [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf), there are 48 classes of events. These are manually copied into a CSV-file.
 
 
 ```r
-# Make column names lower case
-colnames(data) <- colnames(data) %>% tolower()
-
-# Make all categories upper case so that "Early Frost" and "EARLY FROST" is the same category.
-# Replace & or / with AND. 
-data$evtype <- data$evtype %>% toupper() %>% str_trim() %>% sub("[ ]*[$/][ ]*", " AND ", .)
-
-data$evtype[data$evtype == "AVALANCE"] <- "AVALANCHE"
-
-data$evtype <- data$evtype %>% sub("URBAN/SML STREAM FLDG", "URBAN/SMALL STREAM FLOODING",.)
-data$evtype <- data$evtype %>% sub("WIND CHILL", "WINDCHILL",.)
-
-# Group Thunderstorms together
-
-data$evtype <- data$evtype %>% sub("TSTM", "THUNDERSTORM", .)
-data$evtype <- data$evtype %>% sub("THUNDERSTORMW", "THUNDERSTORM WINDS", .)
-data$evtype <- data$evtype %>% sub("THUDERSTORM", "THUNDERSTORM", .)
-data$evtype <- data$evtype %>% sub("TUNDERSTORM", "THUNDERSTORM", .)
-data$evtype <- data$evtype %>% sub("TUNDERSTORMS", "THUNDERSTORM", .)
-
-data$evtype <- data$evtype %>% sub("TUNDERSTORM W INDS", "THUNDERSTORM WINDS", .)
-
-data$evtype[grepl("THUNDER.*WIND", data$evtype ) & !grepl("HAIL", data$evtype ) & !grepl("LIGHTNING", data$evtype ) & !grepl(
-	"FLOOD",data$evtype) & !grepl("TREE",data$evtype) & !grepl("AWNING", data$evtype)] <- "THUNDERSTORM WINDS"
-
-data$evtype <- data$evtype %>% sub("UNSEASONABLE", "UNSEASONABLY",.)
-
-# Remove names for tropical storms
-
-data$evtype[grepl("TROPICAL STORM", data$evtype)] <- "TROPICAL STORM"
-
-data$evtype <- data$evtype %>% sub("TORNADOES", "TORNADO", .)
-data$evtype <- data$evtype %>% sub("TORNDAO", "TORNADO", .)
-
-# Tornado and or waterspout
-data$evtype[grepl("^TORNADO F[0-5]", data$evtype)] <- "TORNADO"
-
-data$evtype[grepl("WATER.*SPOUT", data$evtype) &  grepl("TORNADO", data$evtype)] <- "TORNADO/WATERSPOUT"
-data$evtype[grepl("WATER.*SPOUT", data$evtype) &  !grepl("TORNADO", data$evtype) & !grepl("DUST",data$evtype)] <- "WATERSPOUT"
-
-# Remove "summary of may 21 " types of events
-data <- data[!grepl("^SUMMARY", data$evtype),]
-
-data$evtype[grepl("^HAIL.[0-5]*", data$evtype)] <- "HAIL"
-data$evtype[grepl("^HIGH WIND.*[0-5]*", data$evtype)] <- "HIGH WIND"
-
-data$evtype[grepl("^WILD.*FIRE", data$evtype)] <- "WILDFIRE"
-
-data$evtype[data$evtype == "RIP CURRENT"] <- "RIP CURRENTS"
-data$evtype[data$evtype %in% c("EXTREME HEAT", "EXCESSIVE HEAT", "HEAT WAVE", "RECORD HEAT")] <- "HEAT"
-data$evtype[data$evtype == "DENSE FOG"] <- "FOG"
-data$evtype[data$evtype == "STRONG WIND"] <- "WIND"
-data$evtype[data$evtype == "EXTREME COLD AND WINDCHILL"] <- "COLD AND WINDCHILL"
-data$evtype[data$evtype == "HEAVY SURF"] <- "HIGH SURF"
-data$evtype[data$evtype == "URBAN AND SML STREAM FLD"] <- "FLOOD"
-data$evtype[data$evtype %in% c("WINTER WEATHER AND MIX", "WINTRY MIX", "WINTRY WEATHER MIX")] <- "WINTER WEATHER"
-
-data$evtype[grepl("FLOOD",data$evtype) & !grepl("THUNDER", data$evtype) &  !grepl("RAIN", data$evtype) & !grepl("WIND", data$evtype) & !grepl("LANDSLIDE", data$evtype)] <- "FLOOD"
+eventtypes <- read.csv('eventtypes_10-1605.csv')
+sort(eventtypes$Event.Name)
 ```
 
-The event types are now made up of 548 different strings. Would be nicer to have them strings properly capitalized.
+```
+##  [1] Astronomical Low Tide    Avalanche               
+##  [3] Blizzard                 Coastal Flood           
+##  [5] Cold/Wind Chill          Debris Flow             
+##  [7] Dense Fog                Dense Smoke             
+##  [9] Drought                  Dust Devil              
+## [11] Dust Storm               Excessive Heat          
+## [13] Extreme Cold/Wind Chill  Flash Flood             
+## [15] Flood                    Freezing Fog            
+## [17] Frost/Freeze             Funnel Cloud            
+## [19] Hail                     Heat                    
+## [21] Heavy Rain               Heavy Snow              
+## [23] High Surf                High Wind               
+## [25] Hurricane (Typhoon)      Ice Storm               
+## [27] Lake-Effect Snow         Lakeshore Flood         
+## [29] Lightning                Marine Hail             
+## [31] Marine High Wind         Marine Strong Wind      
+## [33] Marine Thunderstorm Wind Rip Current             
+## [35] Seiche                   Sleet                   
+## [37] Storm Surge/Tide         Strong Wind             
+## [39] Thunderstorm Wind        Tornado                 
+## [41] Tropical Depression      Tropical Storm          
+## [43] Tsunami                  Volcanic Ash            
+## [45] Waterspout               Wildfire                
+## [47] Winter Storm             Winter Weather          
+## 48 Levels: Astronomical Low Tide Avalanche Blizzard ... Winter Weather
+```
+
+The event types are now made up of 799 different strings. First we note that only 73 of the events match any of the accepted values. The values in the data is mixed-case, so let's take care of that first. The values in the accepted list all have the first letter of each word capitalized.
 
 
 ```r
@@ -129,7 +133,125 @@ simpleCap <- function(x) {
           sep = "", collapse = " ")
 }
 
-data$evtype <- data$evtype %>% tolower() %>% sapply(., simpleCap)
+data$evtype <- data$evtype %>% tolower() %>% str_trim() %>% sapply(., simpleCap)
+```
+
+Now we have 515580 strings matching the accepted.
+
+<!--First we make all values upper case, then change "/" and "&" to "AND" to make it easier on the eyes. We focus on the classes that are the most deadly.-->
+
+
+```r
+# Remove "summary of may 21 " types of events
+data <- data[!grepl("^Summary", data$evtype, ignore.case=TRUE),]
+
+data$evtype[data$evtype == "Avalance"] <- "Avalanche"
+
+# Thunderstorms
+data$evtype[grepl('Tstm',data$evtype)] <- "Thunderstorm Wind"
+data$evtype[grepl('Thunderstormw',data$evtype)] <- "Thunderstorm Wind"
+data$evtype[grepl('Thuderstorm',data$evtype)] <- "Thunderstorm Wind"
+data$evtype[grepl('Tunderstorm',data$evtype)] <- "Thunderstorm Wind"
+data$evtype[grepl('Thunderstorm Winds',data$evtype)] <- "Thunderstorm Wind"
+data$evtype[data$evtype == "Severe Thunderstorms"] <- "Thunderstorm Wind"
+data$evtype[grepl("THUNDER.*WIND", data$evtype, ignore.case=TRUE ) & !grepl('marine', data$evtype, ignore.case=TRUE)] <- "Thunderstorm Wind"
+
+data$evtype[grepl("^Wild.*Fire", data$evtype)] <- "Wildfire"
+data$evtype[data$evtype == "Thunderstorm"] <- "Thunderstorm Wind"
+
+data$evtype[grepl("^Tornado", data$evtype, ignore.case=TRUE)] <- "Tornado"
+data$evtype[grepl("w.*spout", data$evtype, ignore.case=TRUE )] <- "Waterspout"
+
+data$evtype[grepl("^Hail.[0-5]*", data$evtype)] <- "Hail"
+# Flooding
+data$evtype[grepl("Flood",data$evtype, ignore.case=TRUE) & grepl("Flash", data$evtype, ignore.case=TRUE) & !grepl("Coastal", data$evtype, ignore.case=TRUE) & !grepl("Cstl", data$evtype, ignore.case=TRUE) & !grepl("Thunder", data$evtype, ignore.case=TRUE) & !grepl("Ice Storm", data$evtype, ignore.case=TRUE)] <- "Flash Flood"
+
+data$evtype[grepl("Flood",data$evtype, ignore.case=TRUE) & !grepl("Flash", data$evtype, ignore.case=TRUE) & !grepl("Coastal", data$evtype, ignore.case=TRUE) & !grepl("Cstl", data$evtype, ignore.case=TRUE) & !grepl("Wind", data$evtype, ignore.case=TRUE) & !grepl("Rain", data$evtype, ignore.case=TRUE)] <- "Flood"
+
+data$evtype[data$evtype == "Coastal Flooding"] <- "Coastal Flood"
+
+data$evtype[grepl("Tropical Storm", data$evtype), ignore.case = TRUE] <- "Tropical Storm"
+```
+
+```
+## Error: incorrect number of subscripts on matrix
+```
+
+```r
+data$evtype[grepl("Fld",data$evtype, ignore.case=TRUE)] <- "Flood"
+
+data$evtype[grepl("Heat",data$evtype, ignore.case=TRUE) & grepl("record",data$evtype, ignore.case=TRUE)] <- "Excessive Heat"
+data$evtype[grepl("Heat",data$evtype, ignore.case=TRUE) & grepl("excessive",data$evtype, ignore.case=TRUE)] <- "Excessive Heat"
+
+data$evtype[grepl("Winter Weather",data$evtype, ignore.case=TRUE)] <- "Winter Weather"
+
+data$evtype[grepl("Surf",data$evtype, ignore.case=TRUE) & !grepl("Rip current", data$evtype, ignore.case=TRUE)] <- "High Surf"
+
+data$evtype[data$evtype == "Frost/freeze"] <- "Frost/Freeze"
+data$evtype[data$evtype == "Extreme Cold/wind Chill"] <- "Extreme Cold/Wind Chill"
+data$evtype[data$evtype == "Extreme Cold"] <- "Extreme Cold/Wind Chill"
+data$evtype[data$evtype == "High Winds"] <- "High Wind"
+data$evtype[data$evtype == "Lake-effect Snow"] <- "Lake-Effect Snow"
+data$evtype[data$evtype == "Snow"] <- "Heavy Snow"
+data$evtype[data$evtype == "Cold/wind Chill"] <- "Cold/Wind Chill"
+data$evtype[data$evtype == "Cold"] <- "Cold/Wind Chill"
+data$evtype[data$evtype == "Cold And Snow"] <- "Cold/Wind Chill"
+
+data$evtype[data$evtype == "Extreme Windchill"] <- "Extreme Cold/Wind Chill"
+data$evtype[data$evtype == "Fog"] <- "Dense Fog"
+data$evtype[data$evtype == "Wind"] <- "High Wind"
+data$evtype[data$evtype == "Rip Currents"] <- "Rip Current"
+data$evtype[data$evtype == "Storm Surge"] <- "Storm Surge/Tide"
+data$evtype[data$evtype == "Storm Surge/tide"] <- "Storm Surge/Tide"
+data$evtype[data$evtype == "Record Warmth"] <- "Excessive Heat"
+data$evtype[data$evtype == "Extreme Heat"] <- "Excessive Heat"
+
+data$evtype[data$evtype == "Unseasonably Warm And Dry"] <- "Heat"
+data$evtype[data$evtype == "Excessive Rainfall"] <- "Heavy Rain"
+
+data$evtype[data$evtype == "Glaze"] <- "Ice Storm"
+data$evtype[data$evtype == "Hurricane"] <- "Hurricane (Typhoon)"
+data$evtype[data$evtype == "Hurricane/typhoon"] <- "Hurricane (Typhoon)"
+
+data$evtype[data$evtype == "Unseasonably Warm"] <- "Heat"
+data$evtype[data$evtype == "Heat Wave"] <- "Heat"
+data$evtype[data$evtype == "Funnel Clouds"] <- "Funnel Cloud"
+data$evtype[data$evtype == "Waterspouts"] <- "Waterspout"
+
+data$evtype[data$evtype == "Strong Winds"] <- "High Wind"
+data$evtype[data$evtype == "Gusty Winds"] <- "High Wind"
+data$evtype[data$evtype == "Winter Storm High Winds"] <- "High Wind"
+data$evtype[data$evtype == "Rough Seas"] <- "Marine Strong Wind"
+
+data$evtype[data$evtype == "Freeze"] <- "Frost/Freeze"
+data$evtype[data$evtype == "Frost"] <- "Frost/Freeze"
+
+# Light snow should be Winter Weather...
+data$evtype[data$evtype == "Light Snow"] <- "Winter Weather"
+
+data$evtype[data$evtype == "Wintry Mix"] <- "Winter Weather"
+
+# Remove Landslides, since not in list
+data$evtype[data$evtype == "Landslide"] <- NA
+```
+
+Now we have 678520 or 99.5737 \% strings matching the accepted. Of the event types not in the accepted list, here are the 10 event types with most entries.
+
+
+```r
+data$evtype[!data$evtype %in% eventtypes$Event.Name] %>% table() %>% sort(., decreasing=T) %>% head(.,10)
+```
+
+```
+## data$evtype[!data$evtype %in% eventtypes$Event.Name]
+##          Freezing Rain         Dry Microburst Astronomical High Tide 
+##                    223                    183                    103 
+##      Moderate Snowfall       Unseasonably Dry                  Other 
+##                    101                     56                     52 
+##             Small Hail     Temperature Record            Record Cold 
+##                     52                     43                     41 
+##    Mixed Precipitation 
+##                     37
 ```
 
 ## Most harmful events with respect to population health
@@ -138,16 +260,10 @@ We would like to find the most harmful event types with respect to human health.
 
 
 ```r
-a <- aggregate(data=data, cbind(fatalities,injuries)~evtype,FUN=sum)
-
-# Sum fatalities and injuries
-a <- transform(a, sum=injuries+fatalities)
-
+a <- aggregate(data=data, fatalities+injuries~evtype,FUN=sum)
+colnames(a) <- c("evtype","count")
 # Sort by sum
-a <- a[order(-a$sum),]
-
-# Remove sum
-a$sum <- NULL
+a <- a[order(-a$count),]
 
 # Make the factor reflect the order
 a$evtype <- factor(a$evtype, a$evtype)
@@ -155,17 +271,16 @@ a$evtype <- factor(a$evtype, a$evtype)
 # Pick out the 50 worst event types
 a <- head(a,50)
 
-# Melt so that we can color after injuries and fatalities
-a <- melt(a, id.vars="evtype")
-
-ggplot(data=a, aes(x = evtype, y = value, fill=variable)) + geom_bar(stat="identity") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + scale_y_log10() 
+ggplot(data=a, aes(x = evtype, y = count)) +
+	geom_bar(stat="identity", fill="orange") +
+	theme(axis.text.x = element_text(angle = 55, hjust = 1)) +
+	scale_y_log10(expand=c(0,0)) +
+	ylab("Number of injured or dead") +
+	xlab("Event type") +
+	ggtitle("Number of injured or dead from the 50 worst event types between 1995 and 2011")
 ```
 
-```
-## Warning: Stacking not well defined when ymin != 0
-```
-
-![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6.png) 
+![plot of chunk aggregate](figure/aggregate.png) 
 
 # Results
 

@@ -4,7 +4,9 @@
 
 Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
 
-This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+This project is part of the course Reproducible research on Coursera and involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database. This database tracks characteristics of major storms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage.
+
+Between 1995 and 2011 tornadoes are the most serious threat to population health, but floods have greater economic impact.
 
 ## Data processing
 
@@ -16,17 +18,11 @@ First we need to load libraries that we will use later.
 ```r
 library(ggplot2)
 library(gridExtra)
-```
-
-```
-## Error: there is no package called 'gridExtra'
-```
-
-```r
 library(plyr)
 library(stringr)
 library(magrittr)
 library(scales)
+library(maps)
 ```
 
 ### Getting and reading data
@@ -71,12 +67,11 @@ We see from a histogram that events start to pick up around 1995, so we subset t
 ggplot(data=data, aes(x=year)) + geom_histogram(binwidth=1, fill="orange") + scale_x_continuous(breaks=pretty_breaks(n=10)) + xlab('Year') + ylab("Number of events of any type") + ggtitle('Number of events per year')
 ```
 
-![plot of chunk histogram_year](figure/histogram_year.png) 
-
 
 ```r
 data = data[data$year >= 1995,]
 ```
+
 The event types are made up of 799 different strings. 
 
 
@@ -149,9 +144,8 @@ simpleCap <- function(x) {
 data$evtype <- data$evtype %>% tolower() %>% str_trim() %>% sapply(., simpleCap)
 ```
 
-Now we have 515580 strings matching the accepted.
+Now we have 515580 strings matching the accepted. However, there are many strings not in the accepted set still.
 
-<!--First we make all values upper case, then change "/" and "&" to "AND" to make it easier on the eyes. We focus on the classes that are the most deadly.-->
 
 
 ```r
@@ -248,7 +242,7 @@ data$evtype[data$evtype == "Wintry Mix"] <- "Winter Weather"
 data$evtype[data$evtype == "Landslide"] <- NA
 ```
 
-Now we have 678520 or 99.5737 \% strings matching the accepted. Of the event types not in the accepted list, here are the 10 event types with most entries.
+Now we have 678520 or 99.5737 % strings matching the accepted. Of the event types not in the accepted list, here are the 10 event types with most entries.
 
 
 ```r
@@ -297,11 +291,16 @@ From the [National Weather Service Instruction 10-1605](https://d396qusza40orc.c
 
 ```r
 data$cropdmgexp <- toupper(data$cropdmgexp)
+
+# Think that H means hundred.
+data$cropdmgexp[data$cropdmgexp == "H"] <- "2"
+data$cropdmgexp[data$cropdmgexp == ""] <- "0"
+
+
 data$cropdmgexp[data$cropdmgexp == "B"] <- "9"
 data$cropdmgexp[data$cropdmgexp == "M"] <- "6"
 data$cropdmgexp[data$cropdmgexp == "K"] <- "3"
-data$cropdmgexp[data$cropdmgexp == "H"] <- "2"
-data$cropdmgexp[data$cropdmgexp == ""] <- "0"
+
 data$cropdmgexp <- as.numeric(data$cropdmgexp)
 ```
 
@@ -312,14 +311,19 @@ data$cropdmgexp <- as.numeric(data$cropdmgexp)
 ```r
 data$cropdamage = data$cropdmg * 10^data$cropdmgexp
 
+# Hundred. Probably.
+data$propdmgexp[data$propdmgexp == "H"] <- "2"
+
+# Hopefully this is not going to blow up
+data$propdmgexp[data$propdmgexp == ""] <- "0"
+data$propdmgexp[data$propdmgexp == "-"] <- "0"
+data$propdmgexp[data$propdmgexp == "+"] <- "0"
+
 data$propdmgexp <- toupper(data$propdmgexp)
 data$propdmgexp[data$propdmgexp == "B"] <- "9"
 data$propdmgexp[data$propdmgexp == "M"] <- "6"
 data$propdmgexp[data$propdmgexp == "K"] <- "3"
-data$propdmgexp[data$propdmgexp == "H"] <- "2"
-data$propdmgexp[data$propdmgexp == ""] <- "0"
-data$propdmgexp[data$propdmgexp == "-"] <- "0"
-data$propdmgexp[data$propdmgexp == "+"] <- "0"
+
 data$propdmgexp <- as.numeric(data$propdmgexp)
 ```
 
@@ -332,6 +336,7 @@ data$propdamage = data$propdmg * 10^data$propdmgexp
 ```
 
 # Results
+
 ## Most harmful events with respect to population health
 
 We would like to find the most harmful event types with respect to human health. We sum together injuries and fatalities, so we disregard the seriousness of fatalities versus injuries.
@@ -356,7 +361,11 @@ health <- ggplot(data=a, aes(x = evtype, y = count)) +
 	ylab("Number of injured or dead") +
 	xlab("Event type") +
 	ggtitle("Number of injured or dead from the 50 worst event types between 1995 and 2011")
+
+print(health)
 ```
+
+![plot of chunk aggregate_health](figure/aggregate_health.png) 
 
 ## Most costly economic consequences
 
@@ -382,7 +391,11 @@ damage <- ggplot(data=a, aes(x = evtype, y = dollar)) +
 	ylab("Economic loss [dollar]") +
 	xlab("Event type") +
 	ggtitle("Economic loss from the 50 worst event types between 1995 and 2011")
+
+print(damage)
 ```
+
+![plot of chunk aggregate_damage](figure/aggregate_damage.png) 
 
 
 ```r
@@ -400,7 +413,46 @@ ggDamage$widths <- maxWidth
 grid.arrange(ggHealth, ggDamage, ncol=1)
 ```
 
-![plot of chunk health_and_damage](figure/health_and_damage.png) 
+## Tornadoes 
+One of the most dangerous event type to human health is tornadoes. They occur more frequently in some parts on the country.
+According to the [Storm Data FAQ Page](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf) the latitude and longitude are in DMS (degrees, minutes, seconds) format, but we would like it to be in decimal format.
 
+
+```r
+data$longitude <- data$longitude/100
+data$latitude <- data$latitude/100
+
+# Not really corrent format
+data$longitude <- -(floor(data$longitude) + data$longitude%%1 * 100/60)
+data$latitude <- floor(data$latitude) + data$latitude%%1 * 100/60
+
+data$longitude_ <- data$longitude_/100
+data$latitude_e <- data$latitude_e/100
+
+# Not really corrent format
+data$longitude_[data$longitude_ == 0] <- data$longitude[data$longitude_ == 0]
+data$latitude_e[data$latitude_e == 0 | is.na(data$latitude_e)] <- data$latitude[data$latitude_e == 0 | is.na(data$latitude_e)]
+
+data$longitude_ <- -(floor(data$longitude_) + data$longitude_%%1 * 100/60)
+data$latitude_e <- floor(data$latitude_e) + data$latitude_e%%1 * 100/60
+
+data$longitude_[data$longitude_ > 0] <- -data$longitude_[data$longitude_ > 0]
+states <- map_data("state")
+
+ggplot() + geom_segment(data=data[data$evtype == "Tornado",], 
+	aes(x=longitude, y=latitude, xend=longitude_, yend=latitude_e, color=(fatalities+injuries)), size=1) + 
+ 	geom_polygon(data=states, aes(x=long, y=lat, group=group), colour="gray50", fill="transparent") +
+ 	coord_cartesian(xlim=c(-125, -65), ylim=c(24,50)) +
+ 	xlab("Longitude") +
+ 	ylab("Latitude") +
+ 	scale_color_continuous(name="Injuries and fatalities") +
+ 	ggtitle("Tornado tracks between 1995 and 2011")
+```
+
+```
+## Warning: Removed 599 rows containing missing values (geom_segment).
+```
+
+![plot of chunk map](figure/map.png) 
 
 

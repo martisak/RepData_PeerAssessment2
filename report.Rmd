@@ -14,6 +14,7 @@ First we need to load libraries that we will use later.
 
 ```{r libraries, cache=TRUE}
 library(ggplot2)
+library(gridExtra)
 library(plyr)
 library(stringr)
 library(magrittr)
@@ -57,7 +58,7 @@ data$year <- as.numeric(strftime(data$bgn_date, "%Y"))
 
 We see from a histogram that events start to pick up around 1995, so we subset the data.
 
-```{r histogram_year, eval=FALSE, fig.width=12}
+```{r histogram_year, fig.width=16}
 ggplot(data=data, aes(x=year)) + geom_histogram(binwidth=1, fill="orange") + scale_x_continuous(breaks=pretty_breaks(n=10)) + xlab('Year') + ylab("Number of events of any type") + ggtitle('Number of events per year')
 ```
 
@@ -196,19 +197,19 @@ We would like to have one variable per column, but for property and crop damage,
 
 Property damage is listed in 'propdmg' and 'propdmgexp' where the latter can take on the values
 
-```{r}
+```{r proplevels}
 levels(data$propdmgexp)
 ```
 
 For crop damage we have the two columns 'cropdmg' and 'cropdmgexp'.
 
-```{r}
+```{r croplevels}
 levels(data$cropdmgexp)
 ```
 
 From the [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) we see that "Alphabetical characters used to signify magnitude include “K” for thousands, “M” for millions, and “B” for billions." We can only assume that 'h' and 'H' means hundred.
 
-```{r}
+```{r exponents, cache=TRUE}
 data$cropdmgexp <- toupper(data$cropdmgexp)
 data$cropdmgexp[data$cropdmgexp == "B"] <- "9"
 data$cropdmgexp[data$cropdmgexp == "M"] <- "6"
@@ -238,7 +239,7 @@ data$propdamage = data$propdmg * 10^data$propdmgexp
 
 We would like to find the most harmful event types with respect to human health. We sum together injuries and fatalities, so we disregard the seriousness of fatalities versus injuries.
 
-```{r aggregate, cache=TRUE, fig.width=12}
+```{r aggregate_health, cache=TRUE, fig.width=12}
 
 a <- aggregate(data=data, fatalities+injuries~evtype,FUN=sum)
 colnames(a) <- c("evtype","count")
@@ -251,7 +252,7 @@ a$evtype <- factor(a$evtype, a$evtype)
 # Pick out the 50 worst event types
 a <- head(a,50)
 
-ggplot(data=a, aes(x = evtype, y = count)) +
+health <- ggplot(data=a, aes(x = evtype, y = count)) +
 	geom_bar(stat="identity", fill="orange") +
 	theme(axis.text.x = element_text(angle = 55, hjust = 1)) +
 	scale_y_log10(expand=c(0,0)) +
@@ -265,7 +266,7 @@ ggplot(data=a, aes(x = evtype, y = count)) +
 
 We treat crop damage and property with equal weight.
 
-```{r aggregate, cache=TRUE, fig.width=12}
+```{r aggregate_damage, cache=TRUE}
 
 a <- aggregate(data=data, cropdamage+propdamage~evtype,FUN=sum)
 colnames(a) <- c("evtype","dollar")
@@ -278,13 +279,30 @@ a$evtype <- factor(a$evtype, a$evtype)
 # Pick out the 50 worst event types
 a <- head(a,50)
 
-ggplot(data=a, aes(x = evtype, y = count)) +
+damage <- ggplot(data=a, aes(x = evtype, y = dollar)) +
 	geom_bar(stat="identity", fill="orange") +
 	theme(axis.text.x = element_text(angle = 55, hjust = 1)) +
 	scale_y_log10(expand=c(0,0)) +
 	ylab("Economic loss [dollar]") +
 	xlab("Event type") +
 	ggtitle("Economic loss from the 50 worst event types between 1995 and 2011")
+
+```
+
+```{r health_and_damage, fig.width=16, fig.height=10, cache=TRUE}
+
+ggHealth <- ggplotGrob(health)
+ggDamage <- ggplotGrob(damage)
+
+maxWidth <- unit.pmax(
+	ggHealth$widths,
+	ggDamage$widths
+	)
+
+ggHealth$widths <- maxWidth
+ggDamage$widths <- maxWidth
+
+grid.arrange(ggHealth, ggDamage, ncol=1)
 
 ```
 

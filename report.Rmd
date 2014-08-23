@@ -126,7 +126,7 @@ We would like to find the most harmful event types with respect to human health.
 
 ```{r, cache=TRUE, fig.width=12}
 
-a <- aggregate(data=data, cbind(fatalities,injuries)~EVTYPE,FUN=sum)
+a <- aggregate(data=data, cbind(fatalities,injuries)~evtype,FUN=sum)
 
 # Sum fatalities and injuries
 a <- transform(a, sum=injuries+fatalities)

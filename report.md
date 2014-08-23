@@ -53,7 +53,7 @@ head(sort(unique(data$EVTYPE)),20)
 ## 985 Levels:    HIGH SURF ADVISORY  COASTAL FLOOD ... WND
 ```
 
-As we can see, there are many spelling mistakes (for example "AVALANCE" instead of "AVALANCHE"), and unnecessarily detailed classes, so we need to fix that. First we make all values upper case, then change "/" and "&" to "AND" to make it easier on the eyes. We focus on the classes that are the most deadly.
+As we can see, there are many spelling mistakes (for example "AVALANCE" instead of "AVALANCHE"), abbreviations, untrimmed strings and unnecessarily detailed classes, so we need to fix that. First we make all values upper case, then change "/" and "&" to "AND" to make it easier on the eyes. We focus on the classes that are the most deadly.
 
 
 ```r
@@ -138,62 +138,34 @@ We would like to find the most harmful event types with respect to human health.
 
 
 ```r
-a <- aggregate(data=data, cbind(fatalities,injuries)~EVTYPE,FUN=sum)
-```
+a <- aggregate(data=data, cbind(fatalities,injuries)~evtype,FUN=sum)
 
-```
-## Error: object 'EVTYPE' not found
-```
-
-```r
 # Sum fatalities and injuries
 a <- transform(a, sum=injuries+fatalities)
-```
 
-```
-## Error: object 'injuries' not found
-```
-
-```r
 # Sort by sum
 a <- a[order(-a$sum),]
-```
 
-```
-## Error: invalid argument to unary operator
-```
-
-```r
 # Remove sum
 a$sum <- NULL
 
 # Make the factor reflect the order
 a$evtype <- factor(a$evtype, a$evtype)
-```
 
-```
-## Error: replacement has 0 rows, data has 150
-```
-
-```r
 # Pick out the 50 worst event types
 a <- head(a,50)
 
 # Melt so that we can color after injuries and fatalities
 a <- melt(a, id.vars="evtype")
-```
 
-```
-## Error: id variables not found in data: evtype
-```
-
-```r
 ggplot(data=a, aes(x = evtype, y = value, fill=variable)) + geom_bar(stat="identity") + theme(axis.text.x = element_text(angle = 90, hjust = 1)) + scale_y_log10() 
 ```
 
 ```
-## Error: object 'evtype' not found
+## Warning: Stacking not well defined when ymin != 0
 ```
+
+![plot of chunk unnamed-chunk-6](figure/unnamed-chunk-6.png) 
 
 # Results
 

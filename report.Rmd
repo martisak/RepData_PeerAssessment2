@@ -1,6 +1,11 @@
-# Severe weather effects on health and economy
+---
+title: "Severe weather effects on health and economy"
+author: "Martin Isaksson"
+date: "August, 24th, 2014"
+output: html_document
+---
 
-## Synopsis
+# Synopsis
 
 Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
 
@@ -8,9 +13,9 @@ This project is part of the course Reproducible research on Coursera and involve
 
 Between 1995 and 2011 tornadoes are the most serious threat to population health, but floods have greater economic impact.
 
-## Data processing
+# Data processing
 
-### Libraries
+## Libraries
 
 First we need to load libraries that we will use later.
 
@@ -24,7 +29,7 @@ library(scales)
 library(maps)
 ```
 
-### Getting and reading data
+## Getting and reading data
 
 The  U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database file is downloaded from the Course web site, but only if it doesn't exist. Then we read the comma-separated-value format. 
 
@@ -41,18 +46,18 @@ data <- read.csv(bzfile(filename))
 
 ```
 
-### Tidying data
+## Tidying data
 
 First we would like to have a column names lowercase.
 
 
-```{r colnames}
+```{r colnames, cache=TRUE}
 colnames(data) <- colnames(data) %>% tolower()
 ```
 
 We know that the events in the database start in the year 1950 and end in November 2011. In the earlier years of the database there are generally fewer events recorded, most likely due to a lack of good records. More recent years should be considered more complete.
 
-```{r year}
+```{r year, cache=TRUE}
 data$bgn_date = as.POSIXct(data$bgn_date, format = "%m/%d/%Y %H:%M:%S")
 data$year <- as.numeric(strftime(data$bgn_date, "%Y"))
 
@@ -61,30 +66,30 @@ data$year <- as.numeric(strftime(data$bgn_date, "%Y"))
 
 We see from a histogram that events start to pick up around 1995, so we subset the data.
 
-```{r histogram_year, fig.width=16, eval=FALSE}
+```{r histogram_year, fig.width=16, eval=FALSE, cache=TRUE}
 ggplot(data=data, aes(x=year)) + geom_histogram(binwidth=1, fill="orange") + scale_x_continuous(breaks=pretty_breaks(n=10)) + xlab('Year') + ylab("Number of events of any type") + ggtitle('Number of events per year')
 ```
 
-```{r subset}
+```{r subset, cache=TRUE}
 data = data[data$year >= 1995,]
 ```
 
 The event types are made up of `r length(unique(data$evtype))` different strings. 
 
-```{r unique_names}
+```{r unique_names, cache=TRUE}
 head(sort(unique(data$evtype)),20)
 ```
 
-As we can see, there are many spelling mistakes (for example "AVALANCE" instead of "AVALANCHE"), abbreviations, untrimmed strings and unnecessarily detailed classes, so we need to fix that. According to [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf), there are 48 classes of events. These are manually copied into a CSV-file.
+As we can see, there are many spelling mistakes (for example `Avalance` instead of `Avalanche`), abbreviations, untrimmed strings and unnecessarily detailed classes, so we need to fix that. According to [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf), there are 48 classes of events. These are manually copied into a CSV-file, and we then try to map the observed strings into these 48 allowed.
 
-```{r accepted_eventtypes}
+```{r accepted_eventtypes, cache=TRUE}
 eventtypes <- read.csv('eventtypes_10-1605.csv')
 sort(eventtypes$Event.Name)
 ```
 
 The event types are now made up of `r length(unique(data$evtype))` different strings. First we note that only `r sum(data$evtype %in% eventtypes$Event.Name)` of the events match any of the accepted values. The values in the data is mixed-case, so let's take care of that first. The values in the accepted list all have the first letter of each word capitalized.
 
-```{r simplecap}
+```{r simplecap, cache=TRUE}
 # from ?toupper
 
 simpleCap <- function(x) {
@@ -100,7 +105,7 @@ data$evtype <- data$evtype %>% tolower() %>% str_trim() %>% sapply(., simpleCap)
 Now we have `r sum(data$evtype %in% eventtypes$Event.Name)` strings matching the accepted. However, there are many strings not in the accepted set still.
 
 
-```{r tidy}
+```{r tidy, cache=TRUE}
 
 # Remove "summary of may 21 " types of events
 data <- data[!grepl("^Summary", data$evtype, ignore.case=TRUE),]
@@ -130,7 +135,7 @@ data$evtype[grepl("Flood",data$evtype, ignore.case=TRUE) & !grepl("Flash", data$
 
 data$evtype[data$evtype == "Coastal Flooding"] <- "Coastal Flood"
 
-data$evtype[grepl("Tropical Storm", data$evtype), ignore.case = TRUE] <- "Tropical Storm"
+#data$evtype[grepl("Tropical Storm", data$evtype), ignore.case = TRUE] <- "Tropical Storm"
 
 data$evtype[grepl("Fld",data$evtype, ignore.case=TRUE)] <- "Flood"
 
@@ -192,25 +197,25 @@ data$evtype[data$evtype == "Landslide"] <- NA
 
 Now we have `r sum(data$evtype %in% eventtypes$Event.Name)` or `r 100 * sum(data$evtype %in% eventtypes$Event.Name)/length(data$evtype)` % strings matching the accepted. Of the event types not in the accepted list, here are the 10 event types with most entries.
 
-```{r notinlist}
+```{r notinlist, cache=TRUE}
 data$evtype[!data$evtype %in% eventtypes$Event.Name] %>% table() %>% sort(., decreasing=T) %>% head(.,10)
 ```
 
 We would like to have one variable per column, but for property and crop damage, this is not the case.
 
-Property damage is listed in 'propdmg' and 'propdmgexp' where the latter can take on the values
+Property damage is listed in `propdmg` and `propdmgexp` where the latter can take on the values
 
-```{r proplevels}
+```{r proplevels, cache=TRUE}
 levels(data$propdmgexp)
 ```
 
-For crop damage we have the two columns 'cropdmg' and 'cropdmgexp'.
+For crop damage we have the two columns `cropdmg' and `cropdmgexp`.
 
-```{r croplevels}
+```{r croplevels, cache=TRUE}
 levels(data$cropdmgexp)
 ```
 
-From the [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) we see that "Alphabetical characters used to signify magnitude include “K” for thousands, “M” for millions, and “B” for billions." We can only assume that 'h' and 'H' means hundred.
+From the [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) we see that "Alphabetical characters used to signify magnitude include “K” for thousands, “M” for millions, and “B” for billions." We can only assume that `h` and `H` means hundred.
 
 ```{r exponents, cache=TRUE}
 data$cropdmgexp <- toupper(data$cropdmgexp)
@@ -326,19 +331,17 @@ grid.arrange(ggHealth, ggDamage, ncol=1)
 One of the most dangerous event type to human health is tornadoes. They occur more frequently in some parts on the country.
 According to the [Storm Data FAQ Page](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2FNCDC%20Storm%20Events-FAQ%20Page.pdf) the latitude and longitude are in DMS (degrees, minutes, seconds) format, but we would like it to be in decimal format.
 
-```{r map, fig.width=12}
+```{r map, fig.width=12, cache=TRUE}
 
 data$longitude <- data$longitude/100
 data$latitude <- data$latitude/100
 
-# Not really corrent format
 data$longitude <- -(floor(data$longitude) + data$longitude%%1 * 100/60)
 data$latitude <- floor(data$latitude) + data$latitude%%1 * 100/60
 
 data$longitude_ <- data$longitude_/100
 data$latitude_e <- data$latitude_e/100
 
-# Not really corrent format
 data$longitude_[data$longitude_ == 0] <- data$longitude[data$longitude_ == 0]
 data$latitude_e[data$latitude_e == 0 | is.na(data$latitude_e)] <- data$latitude[data$latitude_e == 0 | is.na(data$latitude_e)]
 
@@ -354,8 +357,10 @@ ggplot() + geom_segment(data=data[data$evtype == "Tornado",],
  	coord_cartesian(xlim=c(-125, -65), ylim=c(24,50)) +
  	xlab("Longitude") +
  	ylab("Latitude") +
- 	scale_color_continuous(name="Injuries and fatalities") +
- 	ggtitle("Tornado tracks between 1995 and 2011")
+ 	scale_color_continuous(name="Injuries and fatalities") + #trans = "log"
+ 	ggtitle("Tornado tracks between 1995 and 2011") +
+ 	scale_x_continuous(breaks=pretty_breaks(n=10)) +
+ 	scale_y_continuous(breaks=pretty_breaks(n=10))
 ```
 
 

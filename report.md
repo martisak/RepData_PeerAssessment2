@@ -1,6 +1,14 @@
-# Severe weather effects on health and economy
+---
+title: "Severe weather effects on health and economy"
+author: "Martin Isaksson
+date: "August, 24th, 2014"
+output: html_document
+---
 
-## Synopsis
+Severe weather effects on health and economy
+========================================================
+
+# Synopsis
 
 Storms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern.
 
@@ -8,9 +16,9 @@ This project is part of the course Reproducible research on Coursera and involve
 
 Between 1995 and 2011 tornadoes are the most serious threat to population health, but floods have greater economic impact.
 
-## Data processing
+# Data processing
 
-### Libraries
+## Libraries
 
 First we need to load libraries that we will use later.
 
@@ -25,7 +33,7 @@ library(scales)
 library(maps)
 ```
 
-### Getting and reading data
+## Getting and reading data
 
 The  U.S. National Oceanic and Atmospheric Administration's (NOAA) storm database file is downloaded from the Course web site, but only if it doesn't exist. Then we read the comma-separated-value format. 
 
@@ -41,7 +49,7 @@ if (!file.exists(filename)){
 data <- read.csv(bzfile(filename))
 ```
 
-### Tidying data
+## Tidying data
 
 First we would like to have a column names lowercase.
 
@@ -93,7 +101,7 @@ head(sort(unique(data$evtype)),20)
 ## 985 Levels:    HIGH SURF ADVISORY  COASTAL FLOOD ... WND
 ```
 
-As we can see, there are many spelling mistakes (for example "AVALANCE" instead of "AVALANCHE"), abbreviations, untrimmed strings and unnecessarily detailed classes, so we need to fix that. According to [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf), there are 48 classes of events. These are manually copied into a CSV-file.
+As we can see, there are many spelling mistakes (for example `Avalance` instead of `Avalanche`), abbreviations, untrimmed strings and unnecessarily detailed classes, so we need to fix that. According to [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf), there are 48 classes of events. These are manually copied into a CSV-file, and we then try to map the observed strings into these 48 allowed.
 
 
 ```r
@@ -263,7 +271,7 @@ data$evtype[!data$evtype %in% eventtypes$Event.Name] %>% table() %>% sort(., dec
 
 We would like to have one variable per column, but for property and crop damage, this is not the case.
 
-Property damage is listed in 'propdmg' and 'propdmgexp' where the latter can take on the values
+Property damage is listed in `propdmg` and `propdmgexp` where the latter can take on the values
 
 
 ```r
@@ -275,7 +283,7 @@ levels(data$propdmgexp)
 ## [18] "m" "M"
 ```
 
-For crop damage we have the two columns 'cropdmg' and 'cropdmgexp'.
+For crop damage we have the two columns `cropdmg' and `cropdmgexp`.
 
 
 ```r
@@ -286,7 +294,7 @@ levels(data$cropdmgexp)
 ## [1] ""  "?" "0" "2" "B" "k" "K" "m" "M"
 ```
 
-From the [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) we see that "Alphabetical characters used to signify magnitude include “K” for thousands, “M” for millions, and “B” for billions." We can only assume that 'h' and 'H' means hundred.
+From the [National Weather Service Instruction 10-1605](https://d396qusza40orc.cloudfront.net/repdata%2Fpeer2_doc%2Fpd01016005curr.pdf) we see that "Alphabetical characters used to signify magnitude include “K” for thousands, “M” for millions, and “B” for billions." We can only assume that `h` and `H` means hundred.
 
 
 ```r
@@ -422,14 +430,12 @@ According to the [Storm Data FAQ Page](https://d396qusza40orc.cloudfront.net/rep
 data$longitude <- data$longitude/100
 data$latitude <- data$latitude/100
 
-# Not really corrent format
 data$longitude <- -(floor(data$longitude) + data$longitude%%1 * 100/60)
 data$latitude <- floor(data$latitude) + data$latitude%%1 * 100/60
 
 data$longitude_ <- data$longitude_/100
 data$latitude_e <- data$latitude_e/100
 
-# Not really corrent format
 data$longitude_[data$longitude_ == 0] <- data$longitude[data$longitude_ == 0]
 data$latitude_e[data$latitude_e == 0 | is.na(data$latitude_e)] <- data$latitude[data$latitude_e == 0 | is.na(data$latitude_e)]
 
